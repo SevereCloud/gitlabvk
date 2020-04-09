@@ -1,0 +1,34 @@
+---
+project_name: gitlabvk
+
+
+release:
+  github:
+    owner: SevereCloud
+    name: gitlabvk
+
+builds:
+- 
+  main: ./cmd/bot
+  env:
+  - CGO_ENABLED=0
+
+  goos:
+    - linux
+    - windows
+  goarch:
+    - amd64
+    - arm
+    - arm64
+  goarm:
+    - 6
+    - 7
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+    - Merge pull request
+    - Merge branch
