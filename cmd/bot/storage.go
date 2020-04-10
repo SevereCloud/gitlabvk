@@ -16,6 +16,8 @@ const (
 )
 
 func (s *Service) getKey(userID int, key string) string {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	// check cache
 	if v, ok := s.storageCache[fmt.Sprintf("%d_%s", userID, key)]; ok {
 		return v
@@ -37,6 +39,8 @@ func (s *Service) getKey(userID int, key string) string {
 }
 
 func (s *Service) setKey(userID int, key, value string) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	if s.getKey(userID, key) != value {
 		// save cache
 		s.storageCache[fmt.Sprintf("%d_%s", userID, key)] = value
