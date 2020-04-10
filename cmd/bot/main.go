@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/SevereCloud/vksdk/object"
 
@@ -53,8 +54,8 @@ type Service struct {
 	vk *api.VK
 	cb *callback.Callback
 
-	verify *internal.Verification
-
+	verify       *internal.Verification
+	mtx          sync.Mutex
 	storageCache map[string]string
 
 	domain string
