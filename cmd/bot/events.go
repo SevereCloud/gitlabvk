@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/SevereCloud/vksdk/api/errors"
-	"github.com/SevereCloud/vksdk/api/params"
-	"github.com/SevereCloud/vksdk/object"
+	"github.com/SevereCloud/vksdk/v2/api"
+	"github.com/SevereCloud/vksdk/v2/api/params"
+	"github.com/SevereCloud/vksdk/v2/object"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/SevereCloud/gitlabvk/pkg/gitlab"
@@ -52,7 +53,7 @@ func (s *Service) onPush(ctx context.Context, e gitlab.EventPush) {
 	}
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onTagPush(ctx context.Context, e gitlab.EventTagPush) {
@@ -70,7 +71,7 @@ func (s *Service) onTagPush(ctx context.Context, e gitlab.EventTagPush) {
 	}
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onIssue(ctx context.Context, e gitlab.EventIssue) {
@@ -89,7 +90,7 @@ func (s *Service) onIssue(ctx context.Context, e gitlab.EventIssue) {
 	keyboard.AddOpenLinkButton(link, "Open issue", "")
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onNote(ctx context.Context, e gitlab.EventNote) {
@@ -136,7 +137,7 @@ func (s *Service) onNote(ctx context.Context, e gitlab.EventNote) {
 	keyboard.AddOpenLinkButton(link, "Open comment", "")
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onMergeRequest(ctx context.Context, e gitlab.EventMergeRequest) {
@@ -155,7 +156,7 @@ func (s *Service) onMergeRequest(ctx context.Context, e gitlab.EventMergeRequest
 	keyboard.AddOpenLinkButton(link, "Open", "")
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onJob(ctx context.Context, e gitlab.EventJob) {
@@ -236,7 +237,7 @@ func (s *Service) onPipeline(ctx context.Context, e gitlab.EventPipeline) {
 
 	if s.getKey(userID, pipelineLastID) == strconv.Itoa(e.ObjectAttributes.ID) {
 		if e.ObjectAttributes.Status == gitlab.StatusFailed {
-			s.sendMessage(userID, message, &keyboard)
+			s.sendMessage(userID, message, keyboard)
 		} else {
 			s.sendPipelineMessage(userID, message, nil)
 		}
@@ -263,7 +264,7 @@ func (s *Service) onWikiPage(ctx context.Context, e gitlab.EventWikiPage) {
 	keyboard.AddOpenLinkButton(link, "Open page", "")
 
 	userID := getUserID(ctx)
-	s.sendMessage(userID, message, &keyboard)
+	s.sendMessage(userID, message, keyboard)
 }
 
 func (s *Service) onUnknow(ctx context.Context, e interface{}) {
@@ -296,23 +297,28 @@ func (s *Service) sendMessage(peerID int, message string, keyboard *object.Messa
 		retry := false
 
 		id, err := s.vk.MessagesSend(b.Params)
-		switch errors.GetType(err) {
-		case errors.NoType:
+
+		var errCode api.ErrorType
+
+		errors.As(err, &errCode)
+
+		switch errCode {
+		case api.ErrNoType:
 			if err != nil {
 				log.WithError(err).WithFields(log.Fields(b.Params)).Error("Messages send error")
 				return 0
 			}
 
 			return id
-		case errors.TooMany:
+		case api.ErrTooMany:
 			log.WithError(err).WithFields(log.Fields(b.Params)).Warn("Retry send message")
 
 			retry = true
-		case errors.Server:
+		case api.ErrServer:
 			log.WithError(err).WithFields(log.Fields(b.Params)).Warn("Retry send message")
 
 			retry = true
-		case errors.MessagesDenySend:
+		case api.ErrMessagesDenySend:
 			log.WithError(err).WithFields(log.Fields(b.Params)).Info("Messages deny send")
 		default:
 			log.WithError(err).WithFields(log.Fields(b.Params)).Error("Messages send error")

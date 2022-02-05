@@ -10,17 +10,15 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/SevereCloud/vksdk/object"
-
-	"github.com/spf13/viper"
-
-	"github.com/SevereCloud/vksdk/api"
-	"github.com/SevereCloud/vksdk/callback"
-	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/SevereCloud/gitlabvk/internal"
 	"github.com/SevereCloud/gitlabvk/pkg/gitlab"
+	"github.com/SevereCloud/vksdk/v2/api"
+	"github.com/SevereCloud/vksdk/v2/callback"
+	"github.com/SevereCloud/vksdk/v2/events"
+	"github.com/SevereCloud/vksdk/v2/object"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -108,7 +106,7 @@ func NewService(domain string) *Service {
 }
 
 // KeyboardBuild return main keyboard
-func (s *Service) KeyboardBuild() object.MessagesKeyboard {
+func (s *Service) KeyboardBuild() *object.MessagesKeyboard {
 	keyboard := object.NewMessagesKeyboard(true)
 	keyboard.AddRow().AddTextButton(
 		"Настройки для webhook",
@@ -147,7 +145,7 @@ func (s *Service) settingMessageBuild(userID int) (text string) {
 }
 
 // MessageNew callback handler
-func (s *Service) MessageNew(obj object.MessageNewObject, _ int) {
+func (s *Service) MessageNew(_ context.Context, obj events.MessageNewObject) {
 	if obj.Message.PeerID > 2e9 {
 		return
 	}
@@ -158,7 +156,7 @@ func (s *Service) MessageNew(obj object.MessageNewObject, _ int) {
 	var (
 		message    string
 		attachment string
-		keyboard   object.MessagesKeyboard
+		keyboard   *object.MessagesKeyboard
 	)
 
 	keyboard = s.KeyboardBuild()
@@ -289,84 +287,10 @@ func (s *Service) CallbackUpdate() {
 	u.Path += "/callback"
 
 	urlCallback := u.String()
-	callbackServerID := 0
 
-	g, err := s.vk.GroupsGetByID(api.Params{})
-	if err != nil || len(g) == 0 {
-		log.WithError(err).Fatal("VK API groups.getByID error")
-	}
-
-	callbackServers, err := s.vk.GroupsGetCallbackServers(api.Params{
-		"group_id": g[0].ID,
-	})
+	err = s.cb.AutoSetting(s.vk, urlCallback)
 	if err != nil {
-		log.WithError(err).Fatal("VK API groups.getCallbackServers error")
-	}
-
-	for _, cbServer := range callbackServers.Items {
-		if cbServer.URL == urlCallback {
-			// Проверяем статус сервера
-			if cbServer.Status == "ok" {
-				log.WithField("server_id", cbServer.ID).Info("Find Callback server")
-				callbackServerID = cbServer.ID
-				s.cb.SecretKey = cbServer.SecretKey
-
-				break
-			} else {
-				log.WithField("server_id", cbServer.ID).Warn("Broken Callback server")
-
-				_, err = s.vk.GroupsDeleteCallbackServer(api.Params{
-					"group_id":  g[0].ID,
-					"server_id": cbServer.ID,
-				})
-				if err != nil {
-					log.WithField("server_id", cbServer.ID).Error("Delete broken Callback server")
-				}
-			}
-		}
-	}
-
-	// Если мы не нашли сервер в списке, создадим новый
-	if callbackServerID == 0 {
-		// Генерируем секретный ключ
-		secretKey := GenerateRandomString(24)
-		s.cb.SecretKey = secretKey
-
-		// Получаем код подтверждения
-		confirmationCodeResponse, err := s.vk.GroupsGetCallbackConfirmationCode(api.Params{
-			"group_id": g[0].ID,
-		})
-		if err != nil {
-			log.WithError(err).Fatal("VK API groups.getCallbackConfirmationCode error")
-		}
-
-		log.WithField("code", confirmationCodeResponse.Code).Debug("confirmationCodeResponse.Code")
-		s.cb.ConfirmationKey = confirmationCodeResponse.Code
-
-		// Здесь нужно, чтобы сервер был запущен
-		addCallbackResponse, err := s.vk.GroupsAddCallbackServer(api.Params{
-			"group_id":   g[0].ID,
-			"url":        urlCallback,
-			"title":      "GitLab for VK",
-			"secret_key": secretKey,
-		})
-		if err != nil {
-			log.WithError(err).Fatal("VK API groups.getCallbackConfirmationCode error")
-		}
-
-		callbackServerID = addCallbackResponse.ServerID
-		log.WithField("server_id", callbackServerID).Info("Add new Callback server")
-	}
-
-	// Обновляем настройки Callback
-	_, err = s.vk.GroupsSetCallbackSettings(api.Params{
-		"group_id":    g[0].ID,
-		"server_id":   callbackServerID,
-		"api_version": "5.103",
-		"message_new": true,
-	})
-	if err != nil {
-		log.WithError(err).Fatal("VK API groups.setCallbackSettings error")
+		log.WithError(err).Fatal("Callback AutoSetting")
 	}
 }
 

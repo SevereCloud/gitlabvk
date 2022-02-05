@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/SevereCloud/vksdk/api"
+	"github.com/SevereCloud/vksdk/v2/api"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -41,6 +41,7 @@ func (s *Service) getKey(userID int, key string) string {
 func (s *Service) setKey(userID int, key, value string) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
+
 	if s.getKey(userID, key) != value {
 		// save cache
 		s.storageCache[fmt.Sprintf("%d_%s", userID, key)] = value
