@@ -70,6 +70,9 @@ func NewService(domain string) *Service {
 	}
 	s.cb.MessageNew(s.MessageNew)
 
+	s.vk.EnableMessagePack()
+	s.vk.EnableZstd()
+
 	tokenPerm, err := s.vk.GroupsGetTokenPermissions(api.Params{})
 	if err != nil {
 		log.WithError(err).Fatal("VK API groups.getTokenPermissions error")
