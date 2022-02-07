@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/SevereCloud/vksdk/v2/object"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -63,7 +63,7 @@ type Service struct {
 func NewService(domain string) *Service {
 	s := &Service{
 		fl:           gitlab.NewFuncList(),
-		vk:           api.NewVK(viper.GetString("access_token")),
+		vk:           api.NewVK(os.Getenv("GITLABVK_ACCESS_TOKEN")),
 		cb:           callback.NewCallback(),
 		storageCache: make(map[string]string),
 		domain:       domain,
@@ -301,11 +301,9 @@ func (s *Service) Callback(w http.ResponseWriter, r *http.Request) {
 
 func init() {
 	// Flags
-	fileName := flag.String("config", "config.toml", "config file")
 	lvl := flag.String("level", "info", "logger level")
 	flag.Parse()
 
-	log.WithField("fileName", fileName).Debug("config file")
 	log.WithField("level", lvl).Debug("logger level")
 
 	// Logrus level
@@ -316,37 +314,21 @@ func init() {
 	}
 
 	log.SetLevel(level)
-
-	// Viper
-	viper.SetDefault("addr", ":8080")
-
-	viper.SetEnvPrefix("gitlabvk")
-	viper.AutomaticEnv()
-
-	viper.SetConfigFile(*fileName)
-
-	err = viper.ReadInConfig()
-	if err != nil {
-		log.WithError(err).Warn("Error config file")
-	}
-
-	log.WithFields(log.Fields{
-		"addr":         viper.GetString("addr"),
-		"domain":       viper.GetString("domain"),
-		"access_token": viper.GetString("access_token"),
-	}).Debug("Config")
 }
 
 func main() {
-	s := NewService(viper.GetString("domain"))
+	s := NewService(os.Getenv("GITLABVK_DOMAIN"))
+
+	addr := os.Getenv("GITLABVK_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
 
 	// Router setting
 	r := mux.NewRouter()
 	r.HandleFunc("/webhook/{id}", s.Webhook)
 	r.HandleFunc("/callback", s.Callback)
 	http.Handle("/", r)
-
-	addr := viper.GetString("addr")
 	log.Printf("Start server on %s", addr)
 
 	// паралельно обновляем callback
