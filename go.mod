@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/SevereCloud/vksdk/v2 v2.16.0
 	github.com/gorilla/mux v1.8.0
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 )
 
 require (
